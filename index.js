@@ -3,6 +3,7 @@ const express = require('express');
 const app = express();
 const port = process.env.PORT || 5000;
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { default: axios } = require("axios");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ 
 	model: "gemini-2.0-flash",
@@ -102,7 +103,36 @@ app.get('/generate-json', async(req, res)=>{
 	res.send(jsonData)
 });
 
+app.get('/gen', async (req, res) => {
+    try {
+        const prompt = req.query?.prompt;
+        if (!prompt) {
+            return res.status(400).json({ message: 'Please provide a prompt in query' });
+        }
 
+        // Fetch the image
+        const response = await axios.get(prompt, { responseType: 'arraybuffer' });
+
+        // Convert to Base64
+        const responseData = {
+            inlineData: {
+                data: Buffer.from(response.data).toString('base64'),
+                mimeType: "image/png", // Fixed typo
+            },
+        };
+
+        // Generate content
+        const result = await model.generateContent(["tell the detail of the image", responseData]);
+        
+        const detail = result.response.text();
+        console.log(detail);
+
+        res.json({ detail });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal server error", error: error.message });
+    }
+});
 
 app.get('/', (req, res)=>{
 	res.send({message: 'lets crack the power of ai'})
